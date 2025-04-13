@@ -1,0 +1,37 @@
+info:
+  name: "Laravel Logs"
+  identifier: "laravellogs"
+  description: "Laravel Logs for Pterodactyl using Blueprint!"
+  flags: ""
+  version: "v1.3"
+  target: "beta-2024-12"
+  author: "Euphoria Development"
+  icon: "laravellogs_icon.jpg"
+  website: "https://euphoriadevelopment.uk"
+
+admin:
+  view: "admin/view.blade.php"
+  controller: "admin/Controller.php"
+  css: ""
+  wrapper: ""
+
+dashboard:
+  css: ""
+  wrapper: ""
+  components: ""
+
+data:
+  directory: ""
+  public: ""
+  console: ""
+
+requests:
+  views: ""
+  controllers: ""
+  routers:
+    application: ""
+    client: ""
+    web: "routes/web.php"
+
+database:
+  migrations: ""
