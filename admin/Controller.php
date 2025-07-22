@@ -49,6 +49,19 @@ class {identifier}ExtensionController extends Controller
         // Get the selected log file from the request, default to the latest log file
         $selectedLogFile = $request->input('log_file', end($logFiles));
     
+        // Security check: Ensure the selected file is within the logs directory
+        if ($selectedLogFile && !$this->isValidLogFile($selectedLogFile, $logDirPath)) {
+            return $this->view->make(
+                'admin.extensions.{identifier}.index', [
+                    'root' => "/admin/extensions/{identifier}",
+                    'blueprint' => $this->blueprint,
+                    'logs' => 'Access denied: File outside logs directory.',
+                    'logFiles' => $logFiles,
+                    'selectedLogFile' => $selectedLogFile,
+                ]
+            );
+        }
+    
         // Check if the selected log file exists    
         if (!File::exists($selectedLogFile)) {
             return $this->view->make(
@@ -83,6 +96,12 @@ class {identifier}ExtensionController extends Controller
         }
 
         $logFile = $request->input('log_file');
+        $logDirPath = storage_path('logs');
+
+        // Security check: Ensure the requested file is within the logs directory
+        if (!$this->isValidLogFile($logFile, $logDirPath)) {
+            return redirect()->back()->with('error', 'Access denied: File outside logs directory.');
+        }
 
         // Check if the file exists
         if (File::exists($logFile)) {
@@ -90,5 +109,37 @@ class {identifier}ExtensionController extends Controller
         }
 
         return redirect()->back()->with('error', 'Log file not found.');
+    }
+
+    /**
+     * Validate that the file path is within the logs directory and prevent directory traversal
+     */
+    private function isValidLogFile($filePath, $logDirPath): bool
+    {
+        if (empty($filePath)) {
+            return false;
+        }
+
+        // Get the real path to prevent directory traversal attacks
+        $realFilePath = realpath($filePath);
+        $realLogDirPath = realpath($logDirPath);
+
+        // If realpath returns false, the file doesn't exist or path is invalid
+        if ($realFilePath === false || $realLogDirPath === false) {
+            return false;
+        }
+
+        // Check if the file is within the logs directory
+        if (strpos($realFilePath, $realLogDirPath) !== 0) {
+            return false;
+        }
+
+        // Additional check: ensure it's a log file (laravel-*.log pattern)
+        $fileName = basename($realFilePath);
+        if (!preg_match('/^laravel-.*\.log$/', $fileName)) {
+            return false;
+        }
+
+        return true;
     }
 }
