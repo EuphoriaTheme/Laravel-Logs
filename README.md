@@ -9,7 +9,7 @@ View and download Pterodactyl's Laravel log files from the Blueprint admin UI (r
 
 ## Compatibility
 - Blueprint Framework on Pterodactyl Panel
-- Target: `beta-2024-12` (see `conf.yml`)
+- Target: `beta-2026-01` (see `conf.yml`)
 
 ## Installation / Development Guides
 Follow the official Blueprint guides for installing addons and developing extensions:
