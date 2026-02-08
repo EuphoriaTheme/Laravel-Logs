@@ -2,28 +2,28 @@
 
 namespace Pterodactyl\Http\Controllers\Admin\Extensions\{identifier};
 
-use Illuminate\View\View;
-use Illuminate\Support\Facades\File;
-use Pterodactyl\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
-use Illuminate\Queue\SerializesModels;
-use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\View\Factory as ViewFactory;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
-use Pterodactyl\Contracts\Repository\SettingsRepositoryInterface;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\View\Factory as ViewFactory;
+use Illuminate\View\View;
 use Pterodactyl\BlueprintFramework\Libraries\ExtensionLibrary\Admin\BlueprintAdminLibrary as BlueprintExtensionLibrary;
-use Pterodactyl\Http\Requests\Admin\AdminFormRequest;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Exception;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Validator;
-use Pterodactyl\Models\Egg;
-use Pterodactyl\Models\User;
+use Pterodactyl\Contracts\Repository\SettingsRepositoryInterface;
+use Pterodactyl\Http\Controllers\Controller;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
+/**
+ * Blueprint admin controller for the Laravel Logs extension.
+ *
+ * Developer notes:
+ * - `{identifier}` is a Blueprint placeholder replaced during install.
+ * - Access is restricted to root admins.
+ * - Log file access is restricted to `storage/logs/laravel-*.log` and guarded by realpath checks.
+ */
 class {identifier}ExtensionController extends Controller
 {
+    private const MAX_TAIL_LINES = 1000;
+
     public function __construct(
         private ViewFactory $view,
         private BlueprintExtensionLibrary $blueprint,
@@ -37,19 +37,13 @@ class {identifier}ExtensionController extends Controller
             throw new AccessDeniedHttpException();
         }
         
-        // Path to the logs directory
         $logDirPath = storage_path('logs');
 
-        // Directory of the feedback
-        $dir_feedback = "%%__NONCE__%%";
-
-        // Fetch all log files from the logs directory
         $logFiles = File::glob($logDirPath . '/laravel-*.log');
     
-        // Get the selected log file from the request, default to the latest log file
+        // Default to the last match returned by glob(). (Not guaranteed to be the newest.)
         $selectedLogFile = $request->input('log_file', end($logFiles));
     
-        // Security check: Ensure the selected file is within the logs directory
         if ($selectedLogFile && !$this->isValidLogFile($selectedLogFile, $logDirPath)) {
             return $this->view->make(
                 'admin.extensions.{identifier}.index', [
@@ -62,7 +56,6 @@ class {identifier}ExtensionController extends Controller
             );
         }
     
-        // Check if the selected log file exists    
         if (!File::exists($selectedLogFile)) {
             return $this->view->make(
                 'admin.extensions.{identifier}.index', [
@@ -75,8 +68,8 @@ class {identifier}ExtensionController extends Controller
             );
         }
     
-        // Fetch the contents of the selected log file
-        $logs = collect(explode("\n", File::get($selectedLogFile)))->slice(-1000)->implode("\n");
+        // Tail the log for performance (avoids rendering huge files in the browser).
+        $logs = collect(explode("\n", File::get($selectedLogFile)))->slice(-self::MAX_TAIL_LINES)->implode("\n");
     
         return $this->view->make(
             'admin.extensions.{identifier}.index', [
@@ -98,12 +91,10 @@ class {identifier}ExtensionController extends Controller
         $logFile = $request->input('log_file');
         $logDirPath = storage_path('logs');
 
-        // Security check: Ensure the requested file is within the logs directory
         if (!$this->isValidLogFile($logFile, $logDirPath)) {
             return redirect()->back()->with('error', 'Access denied: File outside logs directory.');
         }
 
-        // Check if the file exists
         if (File::exists($logFile)) {
             return response()->download($logFile, basename($logFile))->deleteFileAfterSend(false);
         }
@@ -112,7 +103,8 @@ class {identifier}ExtensionController extends Controller
     }
 
     /**
-     * Validate that the file path is within the logs directory and prevent directory traversal
+     * Returns true only for real files under `$logDirPath` matching `laravel-*.log`.
+     * Uses realpath() checks to mitigate traversal and symlink escapes.
      */
     private function isValidLogFile($filePath, $logDirPath): bool
     {
@@ -120,21 +112,17 @@ class {identifier}ExtensionController extends Controller
             return false;
         }
 
-        // Get the real path to prevent directory traversal attacks
         $realFilePath = realpath($filePath);
         $realLogDirPath = realpath($logDirPath);
 
-        // If realpath returns false, the file doesn't exist or path is invalid
         if ($realFilePath === false || $realLogDirPath === false) {
             return false;
         }
 
-        // Check if the file is within the logs directory
         if (strpos($realFilePath, $realLogDirPath) !== 0) {
             return false;
         }
 
-        // Additional check: ensure it's a log file (laravel-*.log pattern)
         $fileName = basename($realFilePath);
         if (!preg_match('/^laravel-.*\.log$/', $fileName)) {
             return false;
